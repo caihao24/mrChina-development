@@ -103,9 +103,31 @@ Set `isocountries = FALSE` for:
 - bilateral region matrices
 - special parameter objects
 
+## Timestep Alignment
+
+### 9. Use `toolAlignTimesteps()` only where a calc explicitly needs timestep alignment
+If a `calc<Type>()` must align its output years to the MAgPIE timestep set, use `toolAlignTimesteps()` inside that function.
+
+Do not expose timestep alignment choices as user-facing `calcOutput()` parameters by default.
+The developer maintaining the specific `calc<Type>()` should choose the appropriate method and document the reason in that function.
+
+Default pattern:
+- `toolAlignTimesteps(x)` uses `findset("time")`
+- `method = "exact"` keeps exact year matches and fills missing target timesteps with `NA`
+- existing target years keep their original values
+
+Explicit developer choices:
+- `method = "near"` / `"nearest"` for stepwise nearest-year assumptions
+- `method = "average"` with `window = ...` for local moving-window means
+- `tie = "earlier"` / `"later"` only when nearest-year ties matter
+
+Use this helper near the end of `calc<Type>()`, before returning the standard list.
+Do not use it in `read<Type>()`: raw source years do not need to match model timesteps.
+Do not silently align years in generic wrappers unless the wrapper is explicitly responsible for final MAgPIE input delivery.
+
 ## Cell-Level Pattern
 
-### 9. Valid cell-level source pattern
+### 10. Valid cell-level source pattern
 When source data is raster-like but should still be a standard madrat source:
 - `read<Type>()` converts raster to cell-level `magpie`
 - cell ids may be filtered by magclass, for example decimal points in coordinates may become `_`
@@ -116,7 +138,7 @@ Do not assume the first-dimension labels survive unchanged after `as.magpie()`.
 
 ## Full Wrapper Pattern
 
-### 10. `full<Type>()` wrappers should be thin orchestrators
+### 11. `full<Type>()` wrappers should be thin orchestrators
 Wrapper generators like `fullFERTILIZER()` or `fullMAGPIECHINA()` should:
 - accept one explicit output directory from the user
 - call standardized `calcOutput()` entry points
@@ -126,7 +148,7 @@ Wrapper generators like `fullFERTILIZER()` or `fullMAGPIECHINA()` should:
 
 Avoid embedding source-specific path logic in the wrapper.
 
-### 11. Archive only newly generated files
+### 12. Archive only newly generated files
 If a wrapper also creates a tarball:
 - track exactly which files were generated in that run
 - compress only those files
@@ -134,7 +156,7 @@ If a wrapper also creates a tarball:
 
 This avoids accidentally archiving large unrelated data trees.
 
-### 12. File headers should carry provenance
+### 13. File headers should carry provenance
 When writing final `.cs2` / `.cs3` files for delivery, add comment header lines for:
 - human-readable description
 - unit
@@ -144,7 +166,7 @@ When writing final `.cs2` / `.cs3` files for delivery, add comment header lines 
 
 This makes generated inputs traceable without external logs.
 
-### 13. Avoid `setwd()` in full wrappers
+### 14. Avoid `setwd()` in full wrappers
 Do not change the process working directory just to create archives.
 Prefer command forms such as:
 - `system2("tar", c("-czf", archive, "-C", outputdir, basename(files)))`
@@ -153,7 +175,7 @@ This avoids side effects and keeps wrapper behavior predictable inside larger wo
 
 ## Source Sync and Download Policy
 
-### 14. Distinguish public downloads from OSS-only downloads
+### 15. Distinguish public downloads from OSS-only downloads
 If the team uses a local `inputdata` mirror synchronized from OSS, for example via an external `oss_sync.sh` script:
 - keep `download<Type>()` for public internet sources that other users may need on fresh machines
 - remove or deprecate package-internal download helpers that only wrap Aliyun OSS access
@@ -161,7 +183,7 @@ If the team uses a local `inputdata` mirror synchronized from OSS, for example v
 
 Do not keep package-level `download<Type>()` functions whose only purpose is OSS synchronization if that workflow has been replaced by an external sync script.
 
-### 15. Support subtype subdirectories in synced source trees
+### 16. Support subtype subdirectories in synced source trees
 For source types that are naturally organized by subtype, prefer a local layout such as:
 - `sources/CDGTargets/old/<file>`
 - `sources/CDGTargets/new/<file>`
@@ -172,7 +194,7 @@ For source types that are naturally organized by subtype, prefer a local layout 
 
 ## Naming and Compatibility
 
-### 16. Rename source types decisively when the old name should disappear
+### 17. Rename source types decisively when the old name should disappear
 If a source type is renamed, for example `Land` to `LandNBS`:
 - rename the reader and source type consistently
 - update documentation and exports
@@ -186,6 +208,8 @@ Do not keep legacy wrappers unless there is a real migration need.
 - Keeping `convert<Type>()` for cell-level source data and then hitting ISO validation errors
 - Using `getConfig("sourcefolder")` inside `readSource()` or `downloadSource()` paths
 - Marking China-only outputs as `isocountries = TRUE` without expanding to full ISO
+- Aligning timesteps in `read<Type>()` instead of in the specific `calc<Type>()` that needs model timestep compatibility
+- Exposing timestep alignment method choices to ordinary users when the method should be a developer decision
 - Omitting `weight = NULL` or `isocountries` from calc return lists
 - Using `aggregate = TRUE` on outputs already aggregated to region level
 - Writing wrapper archives from the whole output directory instead of the generated file list
@@ -197,6 +221,7 @@ Do not keep legacy wrappers unless there is a real migration need.
 - Table/ISO source data: standard `download/read/convert/calc`
 - Cell/raster source data: standard `download/read/calc`, usually no `convert`
 - Pure generated parameter: `calc<Type>()` only, no source chain required
+- Calc output must match MAgPIE timesteps: use `toolAlignTimesteps()` inside that calc, with the method chosen by the developer
 - Special external model file input: may remain special calc if no clean source abstraction exists
 - Delivery wrapper with archive: write files first, track them, tar only those files
 - Team uses local OSS-synced `inputdata`: remove OSS-only package download helpers, keep public download helpers
